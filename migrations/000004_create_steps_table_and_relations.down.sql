@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS recipes_steps;
+DROP TABLE IF EXISTS steps;
