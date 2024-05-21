@@ -2,10 +2,10 @@ package main
 
 import (
 	"fmt"
-	//"errors"
+	"errors"
 	"net/http"
 
-	//"recipemvp.justinbian/internal/data"
+	"recipemvp.justinbian/internal/data"
 )
 
 type RecipeResource struct {
@@ -33,7 +33,6 @@ type StepResource struct {
 	Description string `json:"description"`
 }
 
-/*
 func (app *application) getRecipeHandler(w http.ResponseWriter, r *http.Request) {
 	id, err := app.readIDParam(r)
 	if err != nil {
@@ -42,7 +41,7 @@ func (app *application) getRecipeHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	recipe, err := app.models.Recipes.Get(id)
+	recipe, err := app.getFullRecipe(id)
 	
 	if err != nil {
 		switch {
@@ -59,7 +58,6 @@ func (app *application) getRecipeHandler(w http.ResponseWriter, r *http.Request)
 		app.serverErrorResponse(w, r, err)
 	}
 }
-*/
 
 func (app *application) createRecipeHandler(w http.ResponseWriter, r *http.Request) {
 	var input struct {
@@ -85,7 +83,7 @@ func (app *application) createRecipeHandler(w http.ResponseWriter, r *http.Reque
 		Steps: input.Steps,
 	}
 
-	err = app.addRecipe(recipe)
+	err = app.addFullRecipe(recipe)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 		return
@@ -100,8 +98,6 @@ func (app *application) createRecipeHandler(w http.ResponseWriter, r *http.Reque
 	}
 }
 
-/*
-
 func (app *application) updateRecipeHandler(w http.ResponseWriter, r *http.Request) {
 	id, err := app.readIDParam(r)
 	if err != nil {
@@ -109,7 +105,7 @@ func (app *application) updateRecipeHandler(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	recipe, err := app.models.Recipes.Get(id)
+	recipe, err := app.getFullRecipe(id)
 	if err != nil {
 		switch {
 		case errors.Is(err, data.ErrRecordNotFound):
@@ -121,15 +117,19 @@ func (app *application) updateRecipeHandler(w http.ResponseWriter, r *http.Reque
 	}
 
 	var input struct {
+		Title *string `json:"title"`
 		Description *string `json:"description"`
 		ImageURL *string `json:"image_url"`
 		Servings *int32 `json:"servings"`
 		CooktimeMinutes *int32 `json:"cooktime"`
+		Ingredients []*IngredientResource `json:"ingredients"`
+		Steps []*StepResource `json:"steps"`
 	}
 
 	err = app.readJSON(w, r, &input)
 	if err != nil {
 		app.badRequestResponse(w, r, err)
+		return
 	}
 
 	if input.Description != nil {
@@ -148,7 +148,15 @@ func (app *application) updateRecipeHandler(w http.ResponseWriter, r *http.Reque
 		recipe.CooktimeMinutes = *input.CooktimeMinutes
 	}
 
-	err = app.models.Recipes.Update(recipe)
+	if input.Ingredients != nil {
+		recipe.Ingredients = input.Ingredients
+	}
+
+	if input.Steps != nil {
+		recipe.Steps = input.Steps
+	}
+
+	err = app.updateFullRecipe(recipe)
 
 	if err != nil {
 		switch {
@@ -173,7 +181,7 @@ func (app *application) deleteRecipeHandler(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	err = app.models.Recipes.Delete(id)
+	err = app.deleteFullRecipe(id)
 	if err != nil {
 		switch {
 		case errors.Is(err, data.ErrRecordNotFound):
@@ -189,4 +197,3 @@ func (app *application) deleteRecipeHandler(w http.ResponseWriter, r *http.Reque
 		app.serverErrorResponse(w, r, err)
 	}
 }
-*/

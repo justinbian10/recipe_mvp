@@ -3,6 +3,7 @@ package data
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"errors"
 	"time"
 
@@ -57,7 +58,7 @@ func (m RecipeModel) Get(tx *sql.Tx, id int64) (*RecipeData, error) {
 	err := tx.QueryRowContext(ctx, query, id).Scan(
 		&recipe.ID,
 		&recipe.CreatedAt,
-		
+		&recipe.Title,
 		&recipe.Description,
 		&recipe.ImageURL,
 		&recipe.Servings,
@@ -94,6 +95,8 @@ func (m RecipeModel) Update(tx *sql.Tx, recipe *RecipeData) error {
 		recipe.Version,
 	}
 
+	fmt.Println(recipe)
+	fmt.Println(recipe.ImageURL)
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 

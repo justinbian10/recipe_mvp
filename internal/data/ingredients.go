@@ -3,21 +3,24 @@ package data
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"time"
 )
 
 type IngredientData struct {
-	ID int64 `json:"id"`
-	CreatedAt time.Time `json:"-"`
-	Name string `json:"name"`
-	FoodType string `json:"food_type"`
+	ID int64 
+	CreatedAt time.Time 
+	Name string 
+	FoodType string
+	Amount string
+	Unit string
 }
 
 type IngredientModel struct {
 	DB *sql.DB
 }
 
-func (m IngredientModel) AddForRecipe(tx *sql.Tx, recipeID int64, ingredientID int64, amount string, unit string) error {
+func (m IngredientModel) AddForRecipe(tx *sql.Tx, recipeID int64, ingredient *IngredientData) error {
 	query := `
 		INSERT INTO recipes_ingredients VALUES ($1, $2, $3, $4)`
 	
@@ -26,33 +29,31 @@ func (m IngredientModel) AddForRecipe(tx *sql.Tx, recipeID int64, ingredientID i
 
 	args := []any{
 		recipeID,
-		ingredientID,
-		amount,
-		unit,
+		ingredient.ID,
+		ingredient.Amount,
+		ingredient.Unit,
 	}
 
 	_, err := tx.ExecContext(ctx, query, args...)
 	return err
 }
-
 /*
-func (m IngredientModel) AddManyForRecipe(recipeID int64, ingredientIDs []int64, amounts []string, units []string) error {
+func (m IngredientModel) AddManyForRecipe(tx *sql.Tx, recipeID int64, ingredients []*IngredientData) error {
 	query := `
-		INSERT INTO recipes_ingredients 
-			SELECT $1, col1, col2, col3 FROM 
-			UNNEST($2, $3, $4) AS u(col1, col2, col3)`
-	
+		INSERT INTO recipes_ingredients (recipe_id, ingredient_id, amount, unit) VALUES `
+
+	values := []any{}
+	values = append(values, recipeID)
+	for i, ingredient := range ingredients {
+		query += fmt.Sprintf("($1, %d, %d, %d),", i*4+1, i*4+2, i*4+3, i*4+4)
+		values = append(values, ingredient.ID, ingredient.Amount, ingredient.Unit)
+	}
+	query = query[:len(query)-1]
+
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	args := []any{
-		recipeID,
-		ingredientIDs,
-		amounts,
-		units
-	}
-
-	_, err := m.DB.ExecContext(ctx, query, args...)
+	_, err := m.DB.ExecContext(ctx, query, values...)
 	return err
 }
 */
@@ -75,30 +76,69 @@ func (m IngredientModel) Insert(tx *sql.Tx, ingredient *IngredientData) error {
 	return tx.QueryRowContext(ctx, query, args...).Scan(&ingredient.ID, &ingredient.CreatedAt)
 }
 
-/*
-func (m IngredientModel) InsertMany(ingredients []*IngredientData) error {
+func (m IngredientModel) UpdateForRecipe(tx *sql.Tx, recipeID int64, ingredients []*IngredientData) error {
+	for _, ingredient := range ingredients {
+		m.Insert(tx, ingredient)
+	}
+
 	query := `
-		INSERT INTO ingredients (name, food_type)
-			SELECT * FROM UNNEST($1, $2)
-		RETURNING id`
+		INSERT INTO recipes_ingredients (recipe_id, ingredient_id, amount, unit) VALUES `
+
+	args := []any{recipeID}
+	for i, ingredient := range ingredients {
+		query += fmt.Sprintf("($1, $%d, $%d, $%d),", i*3+2, i*3+3, i*3+4)
+		args = append(args, ingredient.ID, ingredient.Amount, ingredient.Unit)
+	}
+	query = query[:len(query)-1]
+	
+	query += `
+		ON CONFLICT(recipe_id, ingredient_id) DO UPDATE SET
+		amount = EXCLUDED.amount, unit = EXCLUDED.unit`
+	
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	_, err := tx.ExecContext(ctx, query, args...)
+	return err
+}
+
+
+
+func (m IngredientModel) GetForRecipe(tx *sql.Tx, recipeID int64) ([]*IngredientData, error) {
+	query := `
+		SELECT i.id, i.created_at, i.name, i.food_type, ri.amount, ri.unit
+		FROM recipes_ingredients AS ri LEFT JOIN ingredients AS i ON ri.ingredient_id = i.id
+		WHERE ri.recipe_id = $1`
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	var (
-		ingIDs []*int64
-		ingNames, ingFoodTypes []string
-	)
-	for _, ingredient := range ingredients {
-		ingIDs = append(ingIDs, *ingredient.IDs)
-		ingNames = append(ingNames, ingredient.Name)
-		ingFoodTypes = append(ingFoodTypes, ingredient.FoodType)
+	rows, err := tx.QueryContext(ctx, query, recipeID)
+	if err != nil {
+		return nil, err
 	}
-	args := []any{
-		ingNames,
-		ingFoodTypes,
+	defer rows.Close()
+
+	var ingredients []*IngredientData
+	for rows.Next() {
+		var ingredient IngredientData
+		args := []any{
+			&ingredient.ID,
+			&ingredient.CreatedAt,
+			&ingredient.Name,
+			&ingredient.FoodType,
+			&ingredient.Amount,
+			&ingredient.Unit,
+		}
+		err := rows.Scan(args...)
+		if err != nil {
+			return nil, err
+		}
+		ingredients = append(ingredients, &ingredient)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
 	}
 
-	return m.DB.QueryContext(ctx, query, args...).Scan(ingIDs...)
+	return ingredients, nil
 }
-*/

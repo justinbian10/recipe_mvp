@@ -3,6 +3,7 @@ package data
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"time"
 )
 
@@ -16,7 +17,7 @@ type StepModel struct {
 	DB *sql.DB
 }
 
-func (m StepModel) AddForRecipe(tx *sql.Tx, recipeID int64, stepID int64) error {
+func (m StepModel) AddForRecipe(tx *sql.Tx, recipeID int64, step *StepData) error {
 	query := `
 		INSERT INTO recipes_steps VALUES ($1, $2)`
 	
@@ -25,7 +26,7 @@ func (m StepModel) AddForRecipe(tx *sql.Tx, recipeID int64, stepID int64) error 
 
 	args := []any{
 		recipeID,
-		stepID,
+		step.ID,
 	}
 
 	_, err := tx.ExecContext(ctx, query, args...)
@@ -47,25 +48,84 @@ func (m StepModel) Insert(tx *sql.Tx, step *StepData) error {
 	return tx.QueryRowContext(ctx, query, step.Description).Scan(&step.ID, &step.CreatedAt)
 }
 
-/*
-func (m StepModel) InsertMany(steps []*StepData) error {
+func (m StepModel) GetForRecipe(tx *sql.Tx, recipeID int64) ([]*StepData, error) {
 	query := `
-		INSERT INTO steps (description)
-			SELECT * FROM UNNEST($1)
-		RETURNING id`
+		SELECT s.id, s.created_at, s.description
+		FROM recipes_steps AS rs LEFT JOIN steps AS s ON rs.step_id = s.id
+		WHERE rs.recipe_id = $1`
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second())
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	var (
-		stepIDs []*int64
-		stepDescriptions []string
-	)
-	for _, ingredient := range ingredients {
-		stepIDs = append(stepIDs, *step.IDs)
-		stepDescriptions = append(stepDescrption, step.Description)
+	rows, err := tx.QueryContext(ctx, query, recipeID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var steps []*StepData
+	for rows.Next() {
+		var step StepData
+		args := []any{
+			&step.ID,
+			&step.CreatedAt,
+			&step.Description,
+		}
+		err := rows.Scan(args...)
+		if err != nil {
+			return nil, err
+		}
+		steps = append(steps, &step)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
 	}
 
-	return m.DB.QueryContext(ctx, query, stepDescriptions).Scan(stepIDs...)
+	return steps, nil
 }
-*/
+
+func (m StepModel) UpdateForRecipe(tx *sql.Tx, recipeID int64, steps []*StepData) error {
+	err := m.DeleteForRecipe(tx, recipeID)
+	if err != nil {
+		return err
+	}
+
+	for _, step := range steps {
+		err = m.Insert(tx, step)
+		if err != nil {
+			return err
+		}
+	}
+
+	query := `
+		INSERT INTO recipes_steps (recipe_id, step_id) VALUES `
+
+	args := []any{recipeID}
+	for i, step := range steps {
+		query += fmt.Sprintf("($1, $%d),", i+2)
+		args = append(args, step.ID) 
+	}
+	query = query[:len(query)-1]
+	
+	query += `
+		ON CONFLICT(recipe_id, step_id) DO NOTHING`
+	
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	
+	_, err = tx.ExecContext(ctx, query, args...)
+	return err
+}
+
+func (m StepModel) DeleteForRecipe(tx *sql.Tx, recipeID int64) error {
+	query := `
+		DELETE FROM steps WHERE steps.id IN
+			(SELECT s.id FROM recipes_steps AS rs LEFT JOIN steps AS s ON rs.step_id = s.id
+			WHERE rs.recipe_id = $1)`
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	_, err := tx.ExecContext(ctx, query, recipeID)
+	return err
+}
