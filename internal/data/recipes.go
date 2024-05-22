@@ -3,7 +3,6 @@ package data
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"errors"
 	"time"
 
@@ -95,8 +94,6 @@ func (m RecipeModel) Update(tx *sql.Tx, recipe *RecipeData) error {
 		recipe.Version,
 	}
 
-	fmt.Println(recipe)
-	fmt.Println(recipe.ImageURL)
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 

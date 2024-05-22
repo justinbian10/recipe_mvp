@@ -89,6 +89,7 @@ func (app *application) getFullRecipe(id int64) (*RecipeResource, error) {
 		ID: recipeData.ID,
 		Title: recipeData.Title,
 		Description: recipeData.Description,
+		ImageURL: recipeData.ImageURL,
 		Servings: recipeData.Servings,
 		CooktimeMinutes: recipeData.CooktimeMinutes,
 		Ingredients: ingredients,
@@ -165,34 +166,38 @@ func (app *application) updateFullRecipe(recipe *RecipeResource) error {
 		steps []*data.StepData
 	)
 
-	for _, ingredient := range recipe.Ingredients {
-		ingredients = append(ingredients, ingredientResourceToData(ingredient))
+	if recipe.Ingredients != nil {
+		for _, ingredient := range recipe.Ingredients {
+			ingredients = append(ingredients, ingredientResourceToData(ingredient))
+		}
+
+		err = app.models.Ingredients.UpdateForRecipe(tx, recipeData.ID, ingredients)
+		if err != nil {
+			return err
+		}
+
+		index := 0	
+		for _, ingredient := range ingredients {
+			recipe.Ingredients[index].ID = ingredient.ID
+			index += 1
+		}
 	}
 
-	err = app.models.Ingredients.UpdateForRecipe(tx, recipeData.ID, ingredients)
-	if err != nil {
-		return err
-	}
+	if recipe.Steps != nil {
+		for _, step := range recipe.Steps {
+			steps = append(steps, stepResourceToData(step))
+		}
 
-	index := 0	
-	for _, ingredient := range ingredients {
-		recipe.Ingredients[index].ID = ingredient.ID
-		index += 1
-	}
+		err = app.models.Steps.UpdateForRecipe(tx, recipeData.ID, steps)
+		if err != nil {
+			return err
+		}
 
-	for _, step := range recipe.Steps {
-		steps = append(steps, stepResourceToData(step))
-	}
-
-	err = app.models.Steps.UpdateForRecipe(tx, recipeData.ID, steps)
-	if err != nil {
-		return err
-	}
-
-	index = 0
-	for _, step := range steps {
-		recipe.Steps[index].ID = step.ID
-		index += 1
+		index := 0
+		for _, step := range steps {
+			recipe.Steps[index].ID = step.ID
+			index += 1
+		}
 	}
 
 	return tx.Commit()

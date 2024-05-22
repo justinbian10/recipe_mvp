@@ -77,8 +77,16 @@ func (m IngredientModel) Insert(tx *sql.Tx, ingredient *IngredientData) error {
 }
 
 func (m IngredientModel) UpdateForRecipe(tx *sql.Tx, recipeID int64, ingredients []*IngredientData) error {
+	err := m.DeleteRelationshipForRecipe(tx, recipeID)
+	if err != nil {
+		return err
+	}
+
 	for _, ingredient := range ingredients {
-		m.Insert(tx, ingredient)
+		err = m.Insert(tx, ingredient)
+		if err != nil {
+			return err
+		}
 	}
 
 	query := `
@@ -90,15 +98,16 @@ func (m IngredientModel) UpdateForRecipe(tx *sql.Tx, recipeID int64, ingredients
 		args = append(args, ingredient.ID, ingredient.Amount, ingredient.Unit)
 	}
 	query = query[:len(query)-1]
-	
+/*	
 	query += `
 		ON CONFLICT(recipe_id, ingredient_id) DO UPDATE SET
 		amount = EXCLUDED.amount, unit = EXCLUDED.unit`
+		*/
 	
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	_, err := tx.ExecContext(ctx, query, args...)
+	_, err = tx.ExecContext(ctx, query, args...)
 	return err
 }
 
@@ -141,4 +150,15 @@ func (m IngredientModel) GetForRecipe(tx *sql.Tx, recipeID int64) ([]*Ingredient
 	}
 
 	return ingredients, nil
+}
+
+func (m IngredientModel) DeleteRelationshipForRecipe(tx *sql.Tx, recipeID int64) error {
+	query := `
+		DELETE FROM recipes_ingredients WHERE recipe_id = $1`
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	_, err := tx.ExecContext(ctx, query, recipeID)
+	return err
 }

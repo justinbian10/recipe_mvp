@@ -23,7 +23,7 @@ type RecipeResource struct {
 type IngredientResource struct {
 	ID int64 `json:"id"`
 	Name string `json:"name"`
-	FoodType string `json:"food_type"`
+	FoodType string `json:"food_type,omitempty"`
 	Amount string `json:"amount"`
 	Unit string `json:"unit"`
 }
@@ -37,7 +37,6 @@ func (app *application) getRecipeHandler(w http.ResponseWriter, r *http.Request)
 	id, err := app.readIDParam(r)
 	if err != nil {
 		app.notFoundResponse(w, r)
-		fmt.Println("hi")
 		return
 	}
 
@@ -148,15 +147,21 @@ func (app *application) updateRecipeHandler(w http.ResponseWriter, r *http.Reque
 		recipe.CooktimeMinutes = *input.CooktimeMinutes
 	}
 
-	if input.Ingredients != nil {
-		recipe.Ingredients = input.Ingredients
-	}
+	currIngredients := recipe.Ingredients 
+	currSteps := recipe.Steps
 
-	if input.Steps != nil {
-		recipe.Steps = input.Steps
-	}
+	recipe.Ingredients = input.Ingredients
+	recipe.Steps = input.Steps
 
 	err = app.updateFullRecipe(recipe)
+
+	if input.Ingredients == nil {
+		recipe.Ingredients = currIngredients
+	}
+	
+	if input.Steps == nil {
+		recipe.Steps = currSteps
+	}
 
 	if err != nil {
 		switch {
