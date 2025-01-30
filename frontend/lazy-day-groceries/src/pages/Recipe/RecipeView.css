@@ -1,0 +1,148 @@
+.recipe-view-main {
+	display: flex;
+	padding: 5vw 20%;
+	flex-direction: column;
+	justify-content: center;
+	align-items: stretch;
+}
+
+.ingredient-container, .step-container {
+	width: 100%;
+}
+
+.recipe-view-body-container {
+	border: 2px solid black;
+	padding: 10px;
+}
+
+.recipe-view-body-container, .recipe-view-header-container {
+	min-width: 60%;
+}
+
+
+.recipe-view-header-container {
+	gap: 5px;
+	display: grid;
+	grid-template-columns: min-content minmax(min-content, 6fr) 2fr 1fr;
+	grid-template-rows: max-content max-content 1fr;
+	grid-template-areas:
+		"picture title edit delete"
+		"picture info .... ...."
+		"picture desc desc desc";	
+}
+
+.recipe-view-picture {
+	grid-area: picture;
+	width: 200px;
+	height: 200px;
+	border-radius: 20px;
+	margin: 0;
+}
+
+.recipe-view-title {
+	grid-area: title;
+	font-size: 40px;
+	margin: auto 8px;
+	font-weight: 100;
+	text-align: left;
+}
+
+.recipe-view-button {
+	font-size: 16px;
+	font-weight: 300;
+	border: 2px solid green;
+	border-radius: 5px;
+	height: 30px;
+	align-self: center;
+}
+
+.edit {
+	grid-area: edit;
+	color: white;
+	background-color: green;
+}
+
+.delete {
+	grid-area: delete;
+	background-color: white;
+	color: green;
+}
+
+.recipe-view-desc {
+	grid-area: desc;
+	text-align: left;
+	margin: 5px 10px 0;
+	font-style: italic;
+}
+
+.recipe-view-info-container {
+	grid-area: info;
+	display: flex;
+	gap: 10px;
+	margin: 0 10px;
+}
+
+.info {
+	font-weight: 300;
+	color: green;
+}
+
+.recipe-view-body-container {
+	margin-top: 2vw;
+}
+
+.recipe-view-body-container {
+	width: 100%;
+	display: flex;
+	flex-direction: column;
+	gap: 5px;
+	align-items: center;
+}
+
+.label {
+	align-self: flex-start;
+}
+
+.recipe-view-step {
+	gap: 5px;
+	display: flex;
+}
+
+.step-container {
+	counter-reset: list-number;
+}
+
+.recipe-view-step {
+	counter-increment: list-number;
+}
+
+.step-container .recipe-view-step:before {
+	content: counter(list-number);
+}
+
+.ingredient-container {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(40%, 1fr));
+	gap: 5px 10px;
+}
+
+.recipe-view-ingredient {
+	display: grid;
+	grid-template-columns: 2fr 1fr;
+}
+
+.step-container {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	align-items: flex-start;
+}
+
+.recipe-view-ingredient-name, .recipe-view-ingredient-amount {
+	text-align: left;
+	list-style: none;
+}
+
+.recipe-view-ingredient-amount {
+	font-weight: 600;
+}

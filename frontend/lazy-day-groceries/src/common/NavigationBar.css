@@ -1,0 +1,39 @@
+nav a {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+}
+
+nav li {
+        padding: 0;
+}
+
+nav {
+        border-bottom: 1px solid black;
+        flex: 0 1 auto;
+}
+
+nav > ul {
+        list-style-type: none;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+}
+
+.left, .right {
+        display: flex;
+        padding: 10px 25px;
+        gap: 20px;
+        align-items: center;
+}
+
+.logo {
+        width: 30px;
+        height: 30px;
+        border-radius: 15px;
+}
+
+.logo-text {
+        font-size: 20px;
+}
+

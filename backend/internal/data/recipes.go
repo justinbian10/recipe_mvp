@@ -77,6 +77,50 @@ func (m RecipeModel) Get(tx *sql.Tx, id int64) (*RecipeData, error) {
 	return &recipe, nil
 }
 
+func (m RecipeModel) GetAll(tx *sql.Tx, title string, servings int, cooktime int, filters Filters) ([]*RecipeData, error) {
+	query := `
+		SELECT id, created_at, title, description, image_url, servings, cooktime_minutes, version
+		FROM recipes ORDER BY id`
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	rows, err := tx.QueryContext(ctx, query);
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	var recipeDatas []*RecipeData
+
+	for rows.Next() {
+		var recipeData RecipeData
+
+		err := rows.Scan(
+			&recipeData.ID,
+			&recipeData.CreatedAt,
+			&recipeData.Title,
+			&recipeData.Description,
+			&recipeData.ImageURL,
+			&recipeData.Servings,
+			&recipeData.CooktimeMinutes,
+			&recipeData.Version,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		recipeDatas = append(recipeDatas, &recipeData)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return recipeDatas, nil
+}
+
 func (m RecipeModel) Update(tx *sql.Tx, recipe *RecipeData) error {
 	query := `
 		UPDATE recipes

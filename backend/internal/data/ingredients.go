@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -150,6 +152,96 @@ func (m IngredientModel) GetForRecipe(tx *sql.Tx, recipeID int64) ([]*Ingredient
 	}
 
 	return ingredients, nil
+}
+
+func (m IngredientModel) GetForMultipleRecipes(tx *sql.Tx, recipeIDs []int64) ([]*IngredientData, []int64, error) {
+	var idsAsString []string 
+	for _, id := range recipeIDs {
+		idsAsString = append(idsAsString, strconv.Itoa(int(id)))
+	}
+	ids := strings.Join(idsAsString, ", ")
+	query := fmt.Sprintf(`
+		SELECT i.id, ri.recipe_id, i.created_at, i.name, i.food_type, ri.amount, ri.unit
+		FROM recipes_ingredients AS ri LEFT JOIN ingredients AS i on ri.ingredient_id = i.id
+		WHERE ri.recipe_id IN (%s)`, ids)
+
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	rows, err := tx.QueryContext(ctx, query)
+
+	if err != nil {
+		return nil, nil, err
+	}
+	defer rows.Close()
+
+	var (
+		ingredients []*IngredientData
+		ingredientRecipeIDs []int64
+	)
+	for rows.Next() {
+		var (
+			ingredient IngredientData
+			recipeID int64
+		)
+
+		args := []any{
+			&ingredient.ID,
+			&recipeID,
+			&ingredient.CreatedAt,
+			&ingredient.Name,
+			&ingredient.FoodType,
+			&ingredient.Amount,
+			&ingredient.Unit,
+		}
+		err := rows.Scan(args...)
+		if err != nil {
+			return nil, nil, err
+		}
+		ingredients = append(ingredients, &ingredient)
+		ingredientRecipeIDs = append(ingredientRecipeIDs, recipeID)
+	}
+	
+	if err = rows.Err(); err != nil {
+		return nil, nil, err
+	}
+
+	return ingredients, ingredientRecipeIDs, nil
+}
+
+func (m IngredientModel) GetAll(name string) ([]string, error) {
+	query := `
+		SELECT name FROM ingredients
+		WHERE (STRPOS(LOWER(name), LOWER($1)) > 0 OR $1 = '')
+		ORDER BY name`
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	rows, err := m.DB.QueryContext(ctx, query, name)
+	if err != nil {
+		return nil, err
+	}
+
+	var ingredientNames []string
+
+	for rows.Next() {
+		var ingredientName string
+
+		err := rows.Scan(&ingredientName)
+		if err != nil {
+			return nil, err
+		}
+
+		ingredientNames = append(ingredientNames, ingredientName)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return ingredientNames, nil
 }
 
 func (m IngredientModel) DeleteRelationshipForRecipe(tx *sql.Tx, recipeID int64) error {

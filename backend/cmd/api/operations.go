@@ -100,6 +100,65 @@ func (app *application) getFullRecipe(id int64) (*RecipeResource, error) {
 	return recipe, tx.Commit()
 }
 
+func (app *application) getAllRecipes(title string, servings int, cooktime int, filters data.Filters) ([]*RecipeResource, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	tx, err := app.models.Recipes.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	recipeDatas, err := app.models.Recipes.GetAll(tx, title, servings, cooktime, filters)
+	if err != nil {
+		return nil, err
+	}
+
+	var recipeIDs []int64
+
+	for _, recipeData := range recipeDatas {
+		recipeIDs = append(recipeIDs, recipeData.ID)
+	}
+
+	ingredientDatas, ingredientRecipeIDs, err := app.models.Ingredients.GetForMultipleRecipes(tx, recipeIDs)
+	if err != nil {
+		return nil, err
+	}
+	ingredientMap := make(map[int64][]*IngredientResource)
+	for i, ingredientData := range ingredientDatas {
+		recipeID := ingredientRecipeIDs[i] 
+		ingredientMap[recipeID] = append(ingredientMap[recipeID], ingredientDataToResource(ingredientData))
+	}
+
+	stepDatas, stepRecipeIDs, err := app.models.Steps.GetForMultipleRecipes(tx, recipeIDs)
+	if err != nil {
+		return nil, err
+	}
+	stepMap := make(map[int64][]*StepResource)
+	for i, stepData := range stepDatas {
+		recipeID := stepRecipeIDs[i] 
+		stepMap[recipeID] = append(stepMap[recipeID], stepDataToResource(stepData))
+	}
+
+	var recipeResources []*RecipeResource
+	for _, recipeData := range recipeDatas {
+		recipe := &RecipeResource{
+			ID: recipeData.ID,
+			Title: recipeData.Title,
+			Description: recipeData.Description,
+			ImageURL: recipeData.ImageURL,
+			Servings: recipeData.Servings,
+			CooktimeMinutes: recipeData.CooktimeMinutes,
+			Ingredients: ingredientMap[recipeData.ID],
+			Steps: stepMap[recipeData.ID],
+			Version: recipeData.Version,
+		}
+		recipeResources = append(recipeResources, recipe)
+	}
+
+	return recipeResources, nil
+}
+
 func ingredientDataToResource(ingredientData *data.IngredientData) *IngredientResource {
 	return &IngredientResource{
 		ID: ingredientData.ID,
@@ -218,4 +277,13 @@ func (app *application) deleteFullRecipe(id int64) error {
 		return err
 	}
 	return tx.Commit()
+}
+
+func (app *application) getIngredients(name string) ([]string, error) {
+	ingredientNames, err := app.models.Ingredients.GetAll(name)
+	if err != nil {
+		return nil, err
+	}
+
+	return ingredientNames, nil
 }

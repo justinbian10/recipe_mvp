@@ -58,6 +58,37 @@ func (app *application) getRecipeHandler(w http.ResponseWriter, r *http.Request)
 	}
 }
 
+func (app *application) getAllRecipesHandler(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		Title string
+		Servings int
+		CooktimeMinutes int
+		data.Filters
+	}
+
+	qs := r.URL.Query()
+	input.Title = app.readString(qs, "title", "")
+	input.Servings = app.readInt(qs, "servings", 0)
+	input.CooktimeMinutes = app.readInt(qs, "cooktime", 0)
+	
+	input.Filters.Page = app.readInt(qs, "page", 1)
+	input.Filters.PageSize = app.readInt(qs, "page_size", 20)
+	
+	input.Filters.Sort = app.readString(qs, "sort", "id")
+
+
+	recipes, err := app.getAllRecipes(input.Title, input.Servings, input.CooktimeMinutes, input.Filters)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+
+	err = app.writeJSON(w, http.StatusOK, envelope{"recipes": recipes}, nil)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+	}
+}	
+
 func (app *application) createRecipeHandler(w http.ResponseWriter, r *http.Request) {
 	var input struct {
 		Title string `json:"Title"`
@@ -129,6 +160,10 @@ func (app *application) updateRecipeHandler(w http.ResponseWriter, r *http.Reque
 	if err != nil {
 		app.badRequestResponse(w, r, err)
 		return
+	}
+
+	if input.Title != nil {
+		recipe.Title = *input.Title
 	}
 
 	if input.Description != nil {

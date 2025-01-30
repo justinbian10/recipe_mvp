@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -83,6 +85,60 @@ func (m StepModel) GetForRecipe(tx *sql.Tx, recipeID int64) ([]*StepData, error)
 
 	return steps, nil
 }
+
+func (m StepModel) GetForMultipleRecipes(tx *sql.Tx, recipeIDs []int64) ([]*StepData, []int64, error) {
+	var idsAsString []string
+	for _, id := range recipeIDs {
+		idsAsString = append(idsAsString, strconv.Itoa(int(id)))
+	}
+	ids := strings.Join(idsAsString, ", ")
+
+	query := fmt.Sprintf(`
+		SELECT s.id, rs.recipe_id, s.created_at, s.description
+		FROM recipes_steps AS rs LEFT JOIN steps AS s on rs.step_id = s.id
+		WHERE rs.recipe_id IN (%s)`, ids)
+
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	rows, err := tx.QueryContext(ctx, query)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer rows.Close()
+
+	var (
+		steps []*StepData
+		stepRecipeIDs []int64
+	)
+	for rows.Next() {
+		var (
+			step StepData
+			recipeID int64
+		)
+
+		args := []any{
+			&step.ID,
+			&recipeID,	
+			&step.CreatedAt,
+			&step.Description,
+		}
+		err := rows.Scan(args...)
+		if err != nil {
+			return nil, nil, err
+		}
+		steps = append(steps, &step)
+		stepRecipeIDs = append(stepRecipeIDs, recipeID)
+	}
+	
+	if err = rows.Err(); err != nil {
+		return nil, nil, err
+	}
+
+	return steps, stepRecipeIDs, nil
+}
+
 
 func (m StepModel) UpdateForRecipe(tx *sql.Tx, recipeID int64, steps []*StepData) error {
 	err := m.DeleteForRecipe(tx, recipeID)

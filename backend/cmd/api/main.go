@@ -4,9 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"flag"
+	"fmt"
 	"net/http"
 	"os"
 	"log/slog"
+	"strings"
 	"time"
 
 	"recipemvp.justinbian/internal/data"
@@ -25,6 +27,9 @@ type config struct {
 		maxIdleConns int
 		maxIdleTime time.Duration
 	}
+	cors struct {
+		trustedOrigins []string
+	}
 }
 
 type application struct {
@@ -36,7 +41,7 @@ type application struct {
 func main() {
 	var cfg config
 
-	flag.IntVar(&cfg.port, "port", 4000, "API server port")
+	flag.IntVar(&cfg.port, "port", 8080, "API server port")
 	flag.StringVar(&cfg.env, "env", "development", "Environment (development|staging|production)")
 	
 	flag.StringVar(&cfg.db.dsn, "db-dsn", "", "Postgres DSN")
@@ -44,6 +49,11 @@ func main() {
 	flag.IntVar(&cfg.db.maxOpenConns, "db-max-open-conns", 25, "PostgreSQL max open connections")
 	flag.IntVar(&cfg.db.maxIdleConns, "db-max-idle-conns", 25, "PostgreSQL max idle connections")
 	flag.DurationVar(&cfg.db.maxIdleTime, "db-max-idle-time", 15*time.Minute, "PostgreSQL max connection idle time")
+
+	flag.Func("cors-trusted-origins", "Trusted CORS origins (space separated)", func(val string) error {
+		cfg.cors.trustedOrigins = strings.Fields(val)
+		return nil
+	})
 
 	flag.Parse()
 
@@ -66,7 +76,7 @@ func main() {
 	}
 
 	srv := &http.Server{
-		Addr: ":8080",
+		Addr: fmt.Sprintf(":%d", cfg.port),
 		Handler: app.routes(),
 		IdleTimeout: 5 * time.Second,
 		ReadTimeout: 5 * time.Second,

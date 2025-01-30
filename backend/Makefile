@@ -6,7 +6,7 @@ include .envrc
 
 .PHONY: run/api
 run/api:
-	go run ./cmd/api -db-dsn=${RECIPE_MVP_DB_DSN}
+	go run ./cmd/api -db-dsn=${RECIPE_MVP_DB_DSN} -cors-trusted-origins="http://localhost:5173"
 
 
 .PHONY: db/psql
